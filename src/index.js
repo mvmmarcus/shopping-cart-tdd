@@ -1,77 +1,68 @@
 const promotions = ["SINGLE LOOK", "DOUBLE LOOK", "TRIPLE LOOK", "FULL LOOK"];
 
 function getShoppingCart(ids, productsList) {
-  let cartCategorys = [];
-
   const filteredProducts = productsList.filter((item) => ids.includes(item.id));
 
-  const cartProducts = filteredProducts.map((item) => {
-    if (!cartCategorys.includes(item.category))
-      cartCategorys.push(item.category);
-
-    return {
-      name: item.name,
-      category: item.category,
-    };
+  const {cartProducts, cartCategorys} = filteredProducts.reduce((acc, produto) => {
+    acc.cartCategorys.add(produto.category);
+    acc.cartProducts.push({
+      name: produto.name,
+      category: produto.category,
+    });
+    return acc;
+  }, {
+    cartProducts: [],
+    cartCategorys: new Set() //Não permite a adição de itens duplicados
   });
 
   const promotion =
-    cartCategorys.length <= 4
-      ? promotions[cartCategorys.length - 1]
+    cartCategorys.size <= 4
+      ? promotions[cartCategorys.size - 1]
       : promotions[3];
 
-  const getCartInfos = (filteredProducts) => {
-    let totalPrice = 0;
-    let discountValue = 0;
-    let productsWithPromo = [];
-    filteredProducts.map((item) => {
-      item.promotions.map((it) => {
-        if (it.looks.includes(promotion)) {
-          totalPrice = totalPrice + it.price;
-          discountValue = discountValue + (item.regularPrice - it.price);
-          productsWithPromo.push(item.id);
-        }
-      });
-    });
-    const calculatePriceWithoutPromo = (filteredProducts) => {
-      const productsWithoutPromo = filteredProducts.filter(
-        (item) => !productsWithPromo.includes(item.id)
-      );
+  const {
+    totalPrice,
+    discountValue,
+    totalRegularPrice
+  } = getCartInfo(filteredProducts, promotion);
 
-      const totalPriceWithoutPromo = productsWithoutPromo.reduce(
-        (total, item) => total + item.regularPrice,
-        0
-      );
-      return totalPriceWithoutPromo;
-    };
-    const regularPrice = calculatePriceWithoutPromo(filteredProducts);
-
-    if (regularPrice > 0) {
-      totalPrice = totalPrice + regularPrice;
-    }
-
-    return { totalPrice, discountValue };
-  };
-
-  const { totalPrice, discountValue } = getCartInfos(filteredProducts);
-
-  const totalRegularPrice = filteredProducts.reduce(
-    (totalRegularPrice, item) => totalRegularPrice + item.regularPrice,
-    0
-  );
-
-  const discountPercentage = `${(
-    (discountValue / totalRegularPrice) *
-    100
-  ).toFixed(2)}%`;
+  const discountPercentage = (discountValue / totalRegularPrice) * 100;
 
   return {
     products: cartProducts,
     promotion: promotion,
-    totalPrice: totalPrice.toFixed(2),
-    discountValue: discountValue.toFixed(2),
-    discount: discountPercentage,
+    totalPrice: formatValue(totalPrice),
+    discountValue: formatValue(discountValue),
+    discount: formatPercentage(discountPercentage)
   };
 }
 
-module.exports = { getShoppingCart };
+function getCartInfo(filteredProducts, promotion) {
+  return filteredProducts.reduce((acc, produto) => {
+    for (let promocao of produto.promotions) {
+      if (promocao.looks.includes(promotion)) {
+        acc.totalPrice += promocao.price;
+        acc.discountValue += produto.regularPrice - promocao.price;
+        acc.totalRegularPrice += produto.regularPrice;
+        return acc;
+      }
+    }
+    acc.totalPrice += produto.regularPrice;
+    acc.totalRegularPrice += produto.regularPrice;
+    return acc;
+  }, {
+    totalPrice: 0,
+    discountValue: 0,
+    totalRegularPrice: 0
+  });
+}
+
+function formatPercentage(percentage) {
+  return `${formatValue(percentage)}%`
+}
+
+function formatValue(value) {
+  return value ? value.toFixed(2) : 0.00;
+}
+
+module.exports = {getShoppingCart};
